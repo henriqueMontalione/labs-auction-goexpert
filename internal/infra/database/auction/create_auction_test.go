@@ -8,13 +8,15 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func startMongoContainer(ctx context.Context, t *testing.T) (container testcontainers.Container, uri string) {
+// startMongoContainer starts a MongoDB container and returns it with the connection URI.
+func startMongoContainer(ctx context.Context, t *testing.T) (testcontainers.Container, string) {
 	t.Helper()
 
 	req := testcontainers.ContainerRequest{
@@ -41,8 +43,18 @@ func startMongoContainer(ctx context.Context, t *testing.T) (container testconta
 		t.Fatalf("failed to get container port: %v", err)
 	}
 
-	uri = fmt.Sprintf("mongodb://%s:%s", host, port.Port())
-	return container, uri
+	return container, fmt.Sprintf("mongodb://%s:%s", host, port.Port())
+}
+
+// newTestMongoClient returns a connected *mongo.Client registered for cleanup.
+func newTestMongoClient(ctx context.Context, t *testing.T, uri string) *mongo.Client {
+	t.Helper()
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	if err != nil {
+		t.Fatalf("failed to connect to mongo: %v", err)
+	}
+	t.Cleanup(func() { client.Disconnect(ctx) })
+	return client
 }
 
 func TestCreateAuctionAutoClose(t *testing.T) {
@@ -51,17 +63,9 @@ func TestCreateAuctionAutoClose(t *testing.T) {
 	container, uri := startMongoContainer(ctx, t)
 	defer container.Terminate(ctx)
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
-	if err != nil {
-		t.Fatalf("failed to connect to mongo: %v", err)
-	}
-	defer client.Disconnect(ctx)
-
-	// Use a short duration so the test runs fast
 	t.Setenv("AUCTION_INTERVAL", "2s")
 
-	database := client.Database("auctions_test")
-	repo := NewAuctionRepository(database)
+	repo := newTestRepo(ctx, t, uri)
 
 	auctionEntity, internalErr := auction_entity.CreateAuction(
 		"Vintage Guitar",
@@ -69,12 +73,10 @@ func TestCreateAuctionAutoClose(t *testing.T) {
 		"A rare vintage guitar in excellent condition",
 		auction_entity.Used,
 	)
-	assert.Nil(t, internalErr)
-	assert.NotNil(t, auctionEntity)
+	require.Nil(t, internalErr)
 
-	// Create the auction — this also launches the close goroutine
 	internalErr = repo.CreateAuction(ctx, auctionEntity)
-	assert.Nil(t, internalErr)
+	require.Nil(t, internalErr)
 
 	// Immediately after creation the auction must be Active
 	found, internalErr := repo.FindAuctionById(ctx, auctionEntity.Id)
@@ -84,7 +86,7 @@ func TestCreateAuctionAutoClose(t *testing.T) {
 	// Wait past the configured duration (2s + 1s buffer)
 	time.Sleep(3 * time.Second)
 
-	// Now the goroutine should have fired and updated the status to Completed
+	// The goroutine must have fired and updated the status to Completed
 	found, internalErr = repo.FindAuctionById(ctx, auctionEntity.Id)
 	assert.Nil(t, internalErr)
 	assert.Equal(t, auction_entity.Completed, found.Status, "auction should be Completed after AUCTION_INTERVAL expires")
