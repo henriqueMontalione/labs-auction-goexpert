@@ -90,11 +90,34 @@ curl -X POST http://localhost:8080/bid \
 
 ## Running tests
 
-The integration tests use [Testcontainers](https://testcontainers.com/) and require Docker running locally.
+### Integration tests
+
+Use [Testcontainers](https://testcontainers.com/) and require Docker running locally.
 
 ```bash
-go test ./internal/infra/database/auction/... -v -timeout 60s
+go test ./internal/infra/database/auction/... -v -timeout 300s
+go test ./internal/infra/database/bid/... -v -timeout 300s
 ```
+
+Each test spins up a MongoDB container (~30s startup), so use `-timeout 300s` or higher.
+
+### End-to-end tests
+
+Run against a live stack (`docker-compose up --build` must be running on port 8080).
+
+```bash
+go test -tags e2e ./tests/e2e/... -v -timeout 120s
+```
+
+Scenarios covered:
+
+| Test | What it validates |
+|---|---|
+| `TestE2E_FullAuctionLifecycle` | Create → bid → auto-close → winner → reject late bid (422) |
+| `TestE2E_FilterAuctions` | List by category and productName filters |
+| `TestE2E_NotFoundAuction` | 404 for unknown auction/winner/bid IDs |
+| `TestE2E_InvalidAuctionPayload` | 400 for short product name and category |
+| `TestE2E_ShortAutoClose` | Polls until goroutine closes auction within 30s |
 
 ## Architecture
 

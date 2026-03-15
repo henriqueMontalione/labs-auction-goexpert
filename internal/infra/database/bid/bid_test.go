@@ -6,6 +6,7 @@ import (
 	"fullcycle-auction_go/internal/entity/auction_entity"
 	"fullcycle-auction_go/internal/entity/bid_entity"
 	"fullcycle-auction_go/internal/infra/database/auction"
+	"fullcycle-auction_go/internal/usecase/bid_usecase"
 	"testing"
 	"time"
 
@@ -141,8 +142,9 @@ func TestFindWinningBidByAuctionId(t *testing.T) {
 	assert.Equal(t, a.Id, winner.AuctionId)
 }
 
-// TestBidRejectedOnExpiredAuction verifies that bids are silently discarded
-// after the auction interval expires, ensuring no stale bids are persisted.
+// TestBidRejectedOnExpiredAuction verifies that the repository layer silently
+// discards bids after the auction interval expires (no error, no persistence).
+// The use case layer is responsible for returning a proper error — see TestBidUseCaseRejectsClosedAuction.
 func TestBidRejectedOnExpiredAuction(t *testing.T) {
 	ctx := context.Background()
 	t.Setenv("AUCTION_INTERVAL", "1s")
@@ -161,12 +163,41 @@ func TestBidRejectedOnExpiredAuction(t *testing.T) {
 	require.Nil(t, err)
 
 	internalErr := bidRepo.CreateBid(ctx, []bid_entity.Bid{*lateBid})
-	assert.Nil(t, internalErr, "CreateBid should not return error even for expired auctions")
+	assert.Nil(t, internalErr, "repository layer must not return error for expired auctions")
 
 	// The bid must NOT have been persisted
 	bids, internalErr := bidRepo.FindBidByAuctionId(ctx, a.Id)
 	assert.Nil(t, internalErr)
 	assert.Empty(t, bids, "no bids should be persisted for an expired auction")
+}
+
+// TestBidUseCaseRejectsClosedAuction verifies that the use case returns a conflict
+// error (mapped to HTTP 422) when a bid is placed on a closed auction.
+func TestBidUseCaseRejectsClosedAuction(t *testing.T) {
+	ctx := context.Background()
+	t.Setenv("AUCTION_INTERVAL", "1s")
+	t.Setenv("BATCH_INSERT_INTERVAL", "10s")
+	t.Setenv("MAX_BATCH_SIZE", "10")
+
+	container, uri := startMongoContainer(ctx, t)
+	defer container.Terminate(ctx)
+
+	auctionRepo, bidRepo := newTestRepos(ctx, t, uri)
+	a := createTestAuction(ctx, t, auctionRepo)
+
+	// Wait for the goroutine to close the auction in MongoDB
+	time.Sleep(2 * time.Second)
+
+	uc := bid_usecase.NewBidUseCase(bidRepo, auctionRepo)
+
+	internalErr := uc.CreateBid(ctx, bid_usecase.BidInputDTO{
+		UserId:    uuid.New().String(),
+		AuctionId: a.Id,
+		Amount:    9999.0,
+	})
+
+	require.NotNil(t, internalErr, "use case must return an error for a closed auction")
+	assert.Equal(t, "conflict", internalErr.Err, "error type must be 'conflict' (maps to HTTP 422)")
 }
 
 // TestBidValidation verifies that invalid bid inputs are rejected at the entity level.

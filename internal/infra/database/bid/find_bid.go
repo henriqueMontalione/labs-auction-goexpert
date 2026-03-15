@@ -7,6 +7,7 @@ import (
 	"fullcycle-auction_go/internal/entity/bid_entity"
 	"fullcycle-auction_go/internal/internal_error"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"time"
 )
@@ -52,6 +53,9 @@ func (bd *BidRepository) FindWinningBidByAuctionId(
 	var bidEntityMongo BidEntityMongo
 	opts := options.FindOne().SetSort(bson.D{{Key: "amount", Value: -1}})
 	if err := bd.Collection.FindOne(ctx, filter, opts).Decode(&bidEntityMongo); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, internal_error.NewNotFoundError(fmt.Sprintf("no bids found for auction %s", auctionId))
+		}
 		logger.Error("Error trying to find the auction winner", err)
 		return nil, internal_error.NewInternalServerError("Error trying to find the auction winner")
 	}

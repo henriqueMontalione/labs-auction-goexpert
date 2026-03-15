@@ -27,6 +27,8 @@ func ConvertError(internalError *internal_error.InternalError) *RestErr {
 		return NewBadRequestError(internalError.Error())
 	case "not_found":
 		return NewNotFoundError(internalError.Error())
+	case "conflict":
+		return NewConflictError(internalError.Error())
 	default:
 		return NewInternalServerError(internalError.Error())
 	}
@@ -44,7 +46,7 @@ func NewBadRequestError(message string, causes ...Causes) *RestErr {
 func NewInternalServerError(message string) *RestErr {
 	return &RestErr{
 		Message: message,
-		Err:     "internal_server",
+		Err:     "internal_server_error",
 		Code:    http.StatusInternalServerError,
 		Causes:  nil,
 	}
@@ -55,6 +57,15 @@ func NewNotFoundError(message string) *RestErr {
 		Message: message,
 		Err:     "not_found",
 		Code:    http.StatusNotFound,
+		Causes:  nil,
+	}
+}
+
+func NewConflictError(message string) *RestErr {
+	return &RestErr{
+		Message: message,
+		Err:     "conflict",
+		Code:    http.StatusUnprocessableEntity,
 		Causes:  nil,
 	}
 }
