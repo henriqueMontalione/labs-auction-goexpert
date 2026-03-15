@@ -9,7 +9,7 @@ services:
       - "8080:8080"
     env_file:
       - cmd/auction/.env
-    command: sh -c "/auction"
+    command: sh -c "/app/auction"
     networks:
       - localNetwork
 
