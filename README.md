@@ -93,7 +93,8 @@ curl -X POST http://localhost:8080/bid \
 The integration tests use [Testcontainers](https://testcontainers.com/) and require Docker running locally.
 
 ```bash
-go test ./internal/infra/database/auction/... -v -timeout 60s
+go test ./internal/infra/database/auction/... -v -timeout 300s
+go test ./internal/infra/database/bid/... -v -timeout 300s
 ```
 
 ## Architecture

@@ -60,7 +60,7 @@ func initDependencies(database *mongo.Database) (
 		user_usecase.NewUserUseCase(userRepository))
 	auctionController = auction_controller.NewAuctionController(
 		auction_usecase.NewAuctionUseCase(auctionRepository, bidRepository))
-	bidController = bid_controller.NewBidController(bid_usecase.NewBidUseCase(bidRepository))
+	bidController = bid_controller.NewBidController(bid_usecase.NewBidUseCase(bidRepository, auctionRepository))
 
 	return
 }
