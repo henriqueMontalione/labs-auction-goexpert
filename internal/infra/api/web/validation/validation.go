@@ -30,7 +30,7 @@ func ValidateErr(validation_err error) *rest_err.RestErr {
 	var jsonValidation validator.ValidationErrors
 
 	if errors.As(validation_err, &jsonErr) {
-		return rest_err.NewNotFoundError("Invalid type error")
+		return rest_err.NewBadRequestError("Invalid type error")
 	} else if errors.As(validation_err, &jsonValidation) {
 		errorCauses := []rest_err.Causes{}
 

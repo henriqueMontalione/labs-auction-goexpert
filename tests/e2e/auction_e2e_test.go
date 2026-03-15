@@ -380,6 +380,24 @@ func TestE2E_InvalidAuctionPayload(t *testing.T) {
 				Condition:   1,
 			},
 		},
+		{
+			name: "short description",
+			payload: createAuctionReq{
+				ProductName: "Valid Product Name",
+				Category:    "Electronics",
+				Description: "Too short",
+				Condition:   1,
+			},
+		},
+		{
+			name: "invalid condition",
+			payload: createAuctionReq{
+				ProductName: "Valid Product Name",
+				Category:    "Electronics",
+				Description: "A valid description long enough to pass",
+				Condition:   99,
+			},
+		},
 	}
 
 	for _, tc := range cases {

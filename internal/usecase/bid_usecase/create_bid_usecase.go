@@ -53,8 +53,6 @@ func NewBidUseCase(bidRepository bid_entity.BidEntityRepository, auctionReposito
 	return bidUseCase
 }
 
-var bidBatch []bid_entity.Bid
-
 type BidUseCaseInterface interface {
 	CreateBid(
 		ctx context.Context,
@@ -70,6 +68,8 @@ type BidUseCaseInterface interface {
 func (bu *BidUseCase) triggerCreateRoutine(ctx context.Context) {
 	go func() {
 		defer close(bu.bidChannel)
+
+		var bidBatch []bid_entity.Bid
 
 		for {
 			select {

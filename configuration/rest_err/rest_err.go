@@ -46,7 +46,7 @@ func NewBadRequestError(message string, causes ...Causes) *RestErr {
 func NewInternalServerError(message string) *RestErr {
 	return &RestErr{
 		Message: message,
-		Err:     "internal_server",
+		Err:     "internal_server_error",
 		Code:    http.StatusInternalServerError,
 		Causes:  nil,
 	}
